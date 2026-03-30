@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  alertoffice:
+    build: .
+    container_name: alertoffice
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Flask
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      
+      # Load all environment variables from .env file
+      - APP_SECRET_KEY=${APP_SECRET_KEY}
+      - CUCM_HOST=${CUCM_HOST}
+      - CUCM_USERNAME=${CUCM_USERNAME}
+      - CUCM_PASSWORD=${CUCM_PASSWORD}
+      - CUCM_VERSION=${CUCM_VERSION:-11.5}
+      - CUCM_VERIFY_SSL=${CUCM_VERIFY_SSL:-false}
+      - FREESWITCH_ESL_HOST=${FREESWITCH_ESL_HOST}
+      - FREESWITCH_ESL_PASSWORD=${FREESWITCH_ESL_PASSWORD}
+      - FREESWITCH_ESL_PORT=${FREESWITCH_ESL_PORT:-8021}
+      - PHONE_HTTP_USERNAME=${PHONE_HTTP_USERNAME}
+      - PHONE_HTTP_PASSWORD=${PHONE_HTTP_PASSWORD}
+      - PHONE_HTTP_SCHEME=${PHONE_HTTP_SCHEME:-http}
+      - PHONE_HTTP_PORT=${PHONE_HTTP_PORT:-}
+      
+      # Redis connection
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    
+    volumes:
+      # Application data (SQLite database)
+      - /opt/alertoffice/data:/app/data
+      
+      # Application logs
+      - /opt/alertoffice/logs:/app/logs
+      
+      # Conference recordings
+      - /opt/alertoffice/recordings:/recordings
+      
+      # FreeSWITCH logs (read-only mount)
+      - /opt/freeswitch/logs:/logs:ro
+    
+    depends_on:
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - alertoffice
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: alertoffice-redis
+    restart: unless-stopped
+    command: >
+      sh -c "if [ -n \"$${REDIS_PASSWORD}\" ]; then
+        redis-server --requirepass \"$${REDIS_PASSWORD}\";
+      else
+        redis-server;
+      fi"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - alertoffice
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  alertoffice:
+    name: alertoffice
+    driver: bridge
+
+volumes:
+  redis-data:
+    name: alertoffice-redis-data

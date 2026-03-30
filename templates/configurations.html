@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Configurations - Alert Office{% endblock %}
+
+{% block page_title %}System Configurations{% endblock %}
+
+{% block page_subtitle %}
+<div class="page-pretitle">View system configuration and connection status</div>
+{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+  <!-- CUCM Configuration -->
+  <div class="col-md-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="subheader">Call Manager</div>
+          <div class="ms-auto">
+            <span class="status-dot {% if config.cucm.configured %}status-dot-animated bg-success{% else %}bg-secondary{% endif %}"></span>
+          </div>
+        </div>
+        <div class="h1 mb-3">CUCM</div>
+        <div class="d-flex mb-2">
+          <div>Host</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.cucm.host or 'Not set' }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Username</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.cucm.username or 'Not set' }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>SSL Verify</div>
+          <div class="ms-auto">
+            <span class="badge {% if config.cucm.verify_ssl %}bg-success{% else %}bg-warning{% endif %}">
+              {{ 'Yes' if config.cucm.verify_ssl else 'No' }}
+            </span>
+          </div>
+        </div>
+        <div class="d-flex">
+          <div>Status</div>
+          <div class="ms-auto">
+            <span class="badge {% if config.cucm.configured %}bg-success{% else %}bg-secondary{% endif %}">
+              {{ 'Configured' if config.cucm.configured else 'Not configured' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FreeSWITCH Configuration -->
+  <div class="col-md-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="subheader">FreeSWITCH</div>
+          <div class="ms-auto">
+            <span class="status-dot {% if config.freeswitch.configured %}status-dot-animated bg-success{% else %}bg-secondary{% endif %}"></span>
+          </div>
+        </div>
+        <div class="h1 mb-3">ESL</div>
+        <div class="d-flex mb-2">
+          <div>Host</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.freeswitch.host or 'Not set' }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Port</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.freeswitch.port }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Timeout</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.freeswitch.connect_timeout }}s / {{ config.freeswitch.response_timeout }}s</span>
+          </div>
+        </div>
+        <div class="d-flex">
+          <div>Status</div>
+          <div class="ms-auto">
+            <span class="badge {% if config.freeswitch.configured %}bg-success{% else %}bg-secondary{% endif %}">
+              {{ 'Configured' if config.freeswitch.configured else 'Not configured' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Redis Configuration -->
+  <div class="col-md-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="subheader">Redis Cache</div>
+          <div class="ms-auto">
+            <span class="status-dot {% if config.redis.available %}status-dot-animated bg-success{% else %}bg-warning{% endif %}"></span>
+          </div>
+        </div>
+        <div class="h1 mb-3">Redis</div>
+        <div class="d-flex mb-2">
+          <div>Host</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.redis.host }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Port</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.redis.port }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Keys</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.redis.keys_count }}</span>
+          </div>
+        </div>
+        <div class="d-flex">
+          <div>Status</div>
+          <div class="ms-auto">
+            <span class="badge {% if config.redis.available %}bg-success{% else %}bg-warning{% endif %}">
+              {{ 'Connected' if config.redis.available else 'Unavailable' }}
+            </span>
+          </div>
+        </div>
+        {% if config.redis.error %}
+        <div class="mt-2">
+          <div class="text-muted small">Error:</div>
+          <div class="text-danger small">{{ config.redis.error }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- SQLite Configuration -->
+  <div class="col-md-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="subheader">Database</div>
+          <div class="ms-auto">
+            <span class="status-dot status-dot-animated bg-success"></span>
+          </div>
+        </div>
+        <div class="h1 mb-3">SQLite</div>
+        <div class="d-flex mb-2">
+          <div>Groups</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.sqlite.groups_count }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Devices</div>
+          <div class="ms-auto">
+            <span class="text-muted">{{ config.sqlite.devices_count }}</span>
+          </div>
+        </div>
+        <div class="d-flex mb-2">
+          <div>Database</div>
+          <div class="ms-auto">
+            <span class="text-muted small">{{ config.sqlite.path }}</span>
+          </div>
+        </div>
+        <div class="d-flex">
+          <div>Status</div>
+          <div class="ms-auto">
+            <span class="badge bg-success">Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phone HTTP Configuration -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Phone HTTP Control</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="mb-3">
+              <label class="form-label">Username</label>
+              <div class="form-control-plaintext">{{ config.phone_http.username or 'Not set' }}</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="mb-3">
+              <label class="form-label">Scheme</label>
+              <div class="form-control-plaintext">{{ config.phone_http.scheme }}</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="mb-3">
+              <label class="form-label">Port</label>
+              <div class="form-control-plaintext">{{ config.phone_http.port or 'Default' }}</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="mb-3">
+              <label class="form-label">Status</label>
+              <div>
+                <span class="badge {% if config.phone_http.configured %}bg-success{% else %}bg-secondary{% endif %}">
+                  {{ 'Configured' if config.phone_http.configured else 'Not configured' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Environment Info -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Environment Variables</h3>
+      </div>
+      <div class="card-body">
+        <div class="datagrid">
+          <div class="datagrid-item">
+            <div class="datagrid-title">APP_SECRET_KEY</div>
+            <div class="datagrid-content">{{ '✓ Set' if config.env.app_secret_key else '✗ Not set' }}</div>
+          </div>
+          <div class="datagrid-item">
+            <div class="datagrid-title">CUCM_HOST</div>
+            <div class="datagrid-content">{{ config.env.cucm_host or '✗ Not set' }}</div>
+          </div>
+          <div class="datagrid-item">
+            <div class="datagrid-title">CUCM_USERNAME</div>
+            <div class="datagrid-content">{{ config.env.cucm_username or '✗ Not set' }}</div>
+          </div>
+          <div class="datagrid-item">
+            <div class="datagrid-title">FREESWITCH_ESL_HOST</div>
+            <div class="datagrid-content">{{ config.env.freeswitch_host or '✗ Not set' }}</div>
+          </div>
+          <div class="datagrid-item">
+            <div class="datagrid-title">PHONE_HTTP_USERNAME</div>
+            <div class="datagrid-content">{{ config.env.phone_http_username or '✗ Not set' }}</div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Handle device sync button
+    document.addEventListener('DOMContentLoaded', function() {
+      const syncBtn = document.getElementById('sync-devices-btn');
+      if (syncBtn) {
+        syncBtn.addEventListener('click', async function() {
+          const btn = this;
+          const originalHtml = btn.innerHTML;
+          
+          // Disable button and show loading
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
+          
+          try {
+            const response = await fetch('/api/sync-devices', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              // Show success message
+              alert(`Success! Synced ${data.count} devices from CUCM.`);
+              // Reload page to show updated count
+              window.location.reload();
+            } else {
+              alert(`Error: ${data.error}`);
+              btn.disabled = false;
+              btn.innerHTML = originalHtml;
+            }
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

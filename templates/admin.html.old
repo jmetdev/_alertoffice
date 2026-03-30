@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CUCM Phone Groups</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta19/dist/css/tabler.min.css"
+      rel="stylesheet"
+    >
+  </head>
+  <body class="theme-light">
+    <div class="page">
+      <div class="page-wrapper">
+        <div class="container-xl">
+          <div class="page-header d-print-none">
+            <div class="row g-2 align-items-center">
+              <div class="col">
+                <div>
+                  <h2 class="page-title mb-1" style="background: url('/alertoffice_logo.png') no-repeat left center; background-size: contain; height: 96px; padding-left: 300px;">
+                    <span class="visually-hidden">Kyrene USD Alert Office</span>
+                  </h2>
+                  <div class="text-muted">Admin</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% if error %}
+          <div class="alert alert-danger" role="alert">
+            {{ error }}
+          </div>
+          {% endif %}
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'danger' else 'info' }}" role="alert">
+            {{ message }}
+          </div>
+          {% endfor %}
+          {% endif %}
+          {% endwith %}
+
+          <div class="row row-cards">
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header d-flex align-items-center">
+                  <h3 class="card-title mb-0">Active Alerts</h3>
+                  <a href="#" id="active-alerts-debug-toggle" class="ms-auto btn btn-sm btn-outline-secondary">Show debug</a>
+                </div>
+                <div class="card-body" id="active-alerts-card-body">
+                  <div id="active-alerts-content" class="text-muted">
+                    Loading…
+                  </div>
+                  <div id="active-alerts-debug" class="mt-3 d-none">
+                    <details>
+                      <summary class="text-muted small cursor-pointer">Debug: raw FreeSWITCH response</summary>
+                      <pre id="active-alerts-raw-response" class="bg-dark text-light p-3 rounded small mt-2 mb-0" style="max-height: 400px; overflow: auto;"></pre>
+                    </details>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Create Group</h3>
+                </div>
+                <div class="card-body">
+                  <form method="post" action="/admin" id="group-form">
+                    <div class="mb-3">
+                      <label class="form-label">Group Name</label>
+                      <input class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Description</label>
+                      <textarea class="form-control" name="description" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Extension</label>
+                      <input class="form-control" name="extension">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label">Add Devices</label>
+                      <div class="input-group mb-2">
+                        <input class="form-control" id="device-search" placeholder="Search device names (min 3 chars)">
+                        <button class="btn btn-outline-primary" type="button" id="search-btn">Search</button>
+                      </div>
+                      <div id="search-results" class="list-group mb-3"></div>
+                      <div>
+                        <div class="form-label">Selected Devices</div>
+                        <ul id="selected-devices" class="list-group"></ul>
+                      </div>
+                      <input type="hidden" name="devices" id="devices-input" value="[]">
+                    </div>
+
+                    <div class="mt-4">
+                      <button class="btn btn-primary" type="submit">Save Group</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Existing Groups</h3>
+                </div>
+                <div class="card-body">
+                  {% if groups %}
+                  <div class="list-group">
+                    {% for group in groups %}
+                    <div class="list-group-item">
+                      <div class="d-flex w-100 justify-content-between">
+                        <h4 class="mb-1">{{ group.name }}</h4>
+                        <div class="d-flex gap-2 align-items-center">
+                          <small>{{ group.device_count }} devices</small>
+                          <button class="btn btn-sm btn-outline-primary" type="button" data-group-id="{{ group.id }}">Edit</button>
+                        </div>
+                      </div>
+                      <div class="text-muted">{{ group.description or '' }}</div>
+                      <div class="text-muted">Extension: {{ group.extension or 'N/A' }}</div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% else %}
+                  <div class="text-muted">No groups yet.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal modal-blur fade" id="edit-group-modal" tabindex="-1" role="dialog" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Edit Group</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="edit-error" class="alert alert-danger d-none"></div>
+            <div id="edit-action" class="alert d-none"></div>
+            <form method="post" id="edit-group-form">
+              <div class="row g-3">
+                <div class="col-lg-6">
+                  <div class="mb-3">
+                    <label class="form-label">Group Name</label>
+                    <input class="form-control" name="name" id="edit-name" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" name="description" rows="2" id="edit-description"></textarea>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Extension</label>
+                    <input class="form-control" name="extension" id="edit-extension">
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label">Add Devices</label>
+                    <div class="input-group mb-2">
+                      <input class="form-control" id="edit-device-search" placeholder="Search device names or description (min 3 chars)">
+                      <button class="btn btn-outline-primary" type="button" id="edit-search-btn">Search</button>
+                    </div>
+                    <div id="edit-search-results" class="list-group mb-3"></div>
+                    <div>
+                      <div class="form-label">Selected Devices</div>
+                      <ul id="edit-selected-devices" class="list-group"></ul>
+                    </div>
+                    <input type="hidden" name="devices" id="edit-devices-input" value="[]">
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="card">
+                    <div class="card-header">
+                      <h3 class="card-title">Devices & IPs</h3>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-responsive">
+                        <table class="table table-vcenter">
+                          <thead>
+                            <tr>
+                              <th>Device</th>
+                              <th>IP Address</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody id="edit-device-table"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-4 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-primary" id="edit-test-btn">Test Dial</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-primary" type="submit">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta19/dist/js/tabler.min.js"></script>
+    <script>
+      (function () {
+        const container = document.getElementById('active-alerts-content');
+        if (!container) return;
+
+        let activeAlertsDebugMode = false;
+
+        function renderActiveAlerts(data) {
+          const debugEl = document.getElementById('active-alerts-debug');
+          const rawPre = document.getElementById('active-alerts-raw-response');
+          if (debugEl && rawPre) {
+            if (data.debug && data.debug.raw_response !== undefined) {
+              debugEl.classList.remove('d-none');
+              rawPre.textContent = data.debug.raw_response;
+            } else {
+              debugEl.classList.add('d-none');
+            }
+          }
+          if (data.error) {
+            container.innerHTML = '<div class="alert alert-danger mb-0" role="alert">' + escapeHtml(data.error) + '</div>';
+            return;
+          }
+          const conferences = data.conferences || [];
+          if (conferences.length === 0) {
+            container.innerHTML = '<span class="text-muted">No active alerts configured yet.</span>';
+            return;
+          }
+          const blocks = conferences.map(function (conf) {
+            const confNum = escapeHtml(conf.conference || '');
+            const count = conf.participant_count != null ? conf.participant_count : (conf.members || []).length;
+            const flags = conf.flags || [];
+            const energy = conf.energy_level != null ? String(conf.energy_level) : '—';
+            const flagsBadges = flags.map(function (f) {
+              const label = escapeHtml(String(f));
+              const cls = f === 'running' ? 'bg-success' : (f === 'answered' ? 'bg-info' : (f === 'locked' ? 'bg-warning' : 'bg-secondary'));
+              return '<span class="badge ' + cls + ' me-1">' + label + '</span>';
+            }).join('');
+            const lastActiveIcon = '<span class="text-success d-inline-flex align-items-center" title="Last active speaker"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="icon icon-tabler icons-tabler-filled icon-tabler-microphone"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M19 9a1 1 0 0 1 1 1a8 8 0 0 1 -6.999 7.938l-.001 2.062h3a1 1 0 0 1 0 2h-8a1 1 0 0 1 0 -2h3v-2.062a8 8 0 0 1 -7 -7.938a1 1 0 1 1 2 0a6 6 0 0 0 12 0a1 1 0 0 1 1 -1m-7 -8a4 4 0 0 1 4 4v5a4 4 0 1 1 -8 0v-5a4 4 0 0 1 4 -4" /></svg></span>';
+            const members = (conf.members || []).map(function (m) {
+              const name = escapeHtml(m.name || '—');
+              const cid = escapeHtml(m.caller_id || '—');
+              const hasFloor = m.has_floor === true || String(m.has_floor) === 'true' || m.has_floor === 1;
+              const lastActiveCell = hasFloor ? lastActiveIcon : '';
+              const isTalking = m.talking === true || String(m.talking) === 'true' || m.talking === 1;
+              const talkingCell = isTalking ? '<span class="badge bg-success">Talking</span>' : '';
+              return '<tr><td>' + name + '</td><td>' + cid + '</td><td>' + lastActiveCell + '</td><td>' + talkingCell + '</td></tr>';
+            }).join('');
+            return (
+              '<div class="mb-4">' +
+              '  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">' +
+              '    <h4 class="mb-0">Conference ' + confNum + '</h4>' +
+              '    <span class="badge bg-cyan">' + count + ' participant' + (count !== 1 ? 's' : '') + '</span>' +
+              (flagsBadges ? '    ' + flagsBadges : '') +
+              (energy !== '—' ? '    <span class="badge bg-azure">Energy ' + escapeHtml(energy) + '</span>' : '') +
+              '  </div>' +
+              '  <div class="table-responsive">' +
+              '    <table class="table table-vcenter table-sm">' +
+              '      <thead><tr><th>Caller ID Name</th><th>Caller ID Number</th><th>Last Active Speaker</th><th>Talking</th></tr></thead>' +
+              '      <tbody>' + (members || '<tr><td colspan="4" class="text-muted">No attendees</td></tr>') + '</tbody>' +
+              '    </table>' +
+              '  </div>' +
+              '</div>'
+            );
+          }).join('');
+          container.innerHTML = blocks;
+        }
+
+        function escapeHtml(s) {
+          const div = document.createElement('div');
+          div.textContent = s;
+          return div.innerHTML;
+        }
+
+        function loadActiveAlerts() {
+          const url = activeAlertsDebugMode ? '/api/active-alerts?debug=1' : '/api/active-alerts';
+          fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(renderActiveAlerts)
+            .catch(function () {
+              container.innerHTML = '<div class="alert alert-danger mb-0" role="alert">Failed to load active alerts.</div>';
+            });
+        }
+
+        const debugToggle = document.getElementById('active-alerts-debug-toggle');
+        if (debugToggle) {
+          debugToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            activeAlertsDebugMode = !activeAlertsDebugMode;
+            debugToggle.textContent = activeAlertsDebugMode ? 'Hide debug' : 'Show debug';
+            loadActiveAlerts();
+          });
+        }
+
+        loadActiveAlerts();
+        setInterval(loadActiveAlerts, 10000);
+      })();
+
+      const selected = new Set();
+      const resultsEl = document.getElementById('search-results');
+      const selectedEl = document.getElementById('selected-devices');
+      const devicesInput = document.getElementById('devices-input');
+      const searchBtn = document.getElementById('search-btn');
+      const searchInput = document.getElementById('device-search');
+      let debounceTimer = null;
+
+      function renderSelected() {
+        selectedEl.innerHTML = '';
+        Array.from(selected).sort().forEach((name) => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item d-flex justify-content-between align-items-center';
+          li.textContent = name;
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn btn-sm btn-outline-danger';
+          removeBtn.textContent = 'Remove';
+          removeBtn.onclick = () => {
+            selected.delete(name);
+            devicesInput.value = JSON.stringify(Array.from(selected));
+            renderSelected();
+          };
+          li.appendChild(removeBtn);
+          selectedEl.appendChild(li);
+        });
+        devicesInput.value = JSON.stringify(Array.from(selected));
+        updateResultMarks();
+      }
+
+      function updateResultMarks() {
+        const items = resultsEl.querySelectorAll('[data-device]');
+        items.forEach((item) => {
+          const deviceName = item.dataset.device;
+          const isSelected = selected.has(deviceName);
+          const check = item.querySelector('.selected-check');
+          if (check) {
+            check.textContent = isSelected ? '✓' : '';
+          }
+          item.disabled = isSelected;
+          item.classList.toggle('disabled', isSelected);
+        });
+      }
+
+      async function searchDevices() {
+        const q = searchInput.value.trim();
+        resultsEl.innerHTML = '';
+        if (q.length < 3) return;
+        const res = await fetch(`/api/devices?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (!data.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-muted';
+          empty.textContent = 'No devices found';
+          resultsEl.appendChild(empty);
+          return;
+        }
+        data.forEach((name) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'list-group-item list-group-item-action';
+          item.dataset.device = name.device_name;
+          const title = document.createElement('div');
+          title.className = 'fw-bold';
+          title.textContent = name.device_name;
+          const meta = document.createElement('div');
+          meta.className = 'text-muted small';
+          const pool = name.device_pool || 'No device pool';
+          const desc = name.description || 'No description';
+          meta.textContent = `${pool} • ${desc}`;
+          const check = document.createElement('div');
+          check.className = 'selected-check text-success fw-bold';
+          check.textContent = selected.has(name.device_name) ? '✓' : '';
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.appendChild(check);
+          item.onclick = () => {
+            selected.add(name.device_name);
+            renderSelected();
+          };
+          resultsEl.appendChild(item);
+        });
+        updateResultMarks();
+      }
+
+      function debouncedSearch() {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(searchDevices, 300);
+      }
+
+      searchBtn.addEventListener('click', searchDevices);
+      searchInput.addEventListener('input', debouncedSearch);
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchDevices();
+        }
+      });
+
+      const editModalEl = document.getElementById('edit-group-modal');
+      const editModal = new window.bootstrap.Modal(editModalEl);
+      const editForm = document.getElementById('edit-group-form');
+      const editName = document.getElementById('edit-name');
+      const editDescription = document.getElementById('edit-description');
+      const editExtension = document.getElementById('edit-extension');
+      const editDevicesInput = document.getElementById('edit-devices-input');
+      const editSelectedEl = document.getElementById('edit-selected-devices');
+      const editResultsEl = document.getElementById('edit-search-results');
+      const editSearchBtn = document.getElementById('edit-search-btn');
+      const editSearchInput = document.getElementById('edit-device-search');
+      const editDeviceTable = document.getElementById('edit-device-table');
+      const editError = document.getElementById('edit-error');
+      const editAction = document.getElementById('edit-action');
+      const editTestBtn = document.getElementById('edit-test-btn');
+      let editSelected = new Set();
+      let editDebounceTimer = null;
+      let activeGroupId = null;
+
+      function renderEditSelected() {
+        editSelectedEl.innerHTML = '';
+        Array.from(editSelected).sort().forEach((name) => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item d-flex justify-content-between align-items-center';
+          li.textContent = name;
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn btn-sm btn-outline-danger';
+          removeBtn.textContent = 'Remove';
+          removeBtn.onclick = () => {
+            editSelected.delete(name);
+            editDevicesInput.value = JSON.stringify(Array.from(editSelected));
+            renderEditSelected();
+            renderEditDeviceTable();
+          };
+          li.appendChild(removeBtn);
+          editSelectedEl.appendChild(li);
+        });
+        editDevicesInput.value = JSON.stringify(Array.from(editSelected));
+        updateEditResultMarks();
+      }
+
+      function renderEditDeviceTable(ipMap = {}, statusMap = {}) {
+        editDeviceTable.innerHTML = '';
+        Array.from(editSelected).sort().forEach((name) => {
+          const tr = document.createElement('tr');
+          const ip = ipMap[name] || 'Not found';
+          const status = statusMap[name] || 'Unknown';
+          tr.innerHTML = `<td>${name}</td><td>${ip}</td><td>${status}</td>`;
+          editDeviceTable.appendChild(tr);
+        });
+      }
+
+      function updateEditResultMarks() {
+        const items = editResultsEl.querySelectorAll('[data-device]');
+        items.forEach((item) => {
+          const deviceName = item.dataset.device;
+          const isSelected = editSelected.has(deviceName);
+          const check = item.querySelector('.selected-check');
+          if (check) {
+            check.textContent = isSelected ? '✓' : '';
+          }
+          item.disabled = isSelected;
+          item.classList.toggle('disabled', isSelected);
+        });
+      }
+
+      async function searchEditDevices() {
+        const q = editSearchInput.value.trim();
+        editResultsEl.innerHTML = '';
+        if (q.length < 3) return;
+        const res = await fetch(`/api/devices?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (!data.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-muted';
+          empty.textContent = 'No devices found';
+          editResultsEl.appendChild(empty);
+          return;
+        }
+        data.forEach((row) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'list-group-item list-group-item-action';
+          item.dataset.device = row.device_name;
+          const title = document.createElement('div');
+          title.className = 'fw-bold';
+          title.textContent = row.device_name;
+          const meta = document.createElement('div');
+          meta.className = 'text-muted small';
+          const pool = row.device_pool || 'No device pool';
+          const desc = row.description || 'No description';
+          meta.textContent = `${pool} • ${desc}`;
+          const check = document.createElement('div');
+          check.className = 'selected-check text-success fw-bold';
+          check.textContent = editSelected.has(row.device_name) ? '✓' : '';
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.appendChild(check);
+          item.onclick = () => {
+            editSelected.add(row.device_name);
+            renderEditSelected();
+            renderEditDeviceTable();
+          };
+          editResultsEl.appendChild(item);
+        });
+        updateEditResultMarks();
+      }
+
+      function debouncedEditSearch() {
+        if (editDebounceTimer) {
+          clearTimeout(editDebounceTimer);
+        }
+        editDebounceTimer = setTimeout(searchEditDevices, 300);
+      }
+
+      editSearchBtn.addEventListener('click', searchEditDevices);
+      editSearchInput.addEventListener('input', debouncedEditSearch);
+      editSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchEditDevices();
+        }
+      });
+
+      document.querySelectorAll('[data-group-id]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const groupId = btn.dataset.groupId;
+          activeGroupId = groupId;
+          editError.classList.add('d-none');
+          editError.textContent = '';
+          editAction.classList.add('d-none');
+          editAction.textContent = '';
+          const res = await fetch(`/api/groups/${groupId}`);
+          if (!res.ok) {
+            editError.textContent = 'Unable to load group details.';
+            editError.classList.remove('d-none');
+            return;
+          }
+          const data = await res.json();
+          const group = data.group;
+          editForm.action = `/admin/groups/${group.id}/edit`;
+          editName.value = group.name || '';
+          editDescription.value = group.description || '';
+          editExtension.value = group.extension || '';
+          editSelected = new Set(group.devices || []);
+          renderEditSelected();
+          renderEditDeviceTable(data.device_ips || {}, data.status_map || {});
+          editModal.show();
+        });
+      });
+
+      editTestBtn.addEventListener('click', async () => {
+        if (!activeGroupId) return;
+        editAction.classList.add('d-none');
+        editAction.textContent = '';
+        editAction.classList.remove('alert-info', 'alert-danger', 'alert-success');
+        const extension = (editExtension.value || '8888').trim();
+        editTestBtn.disabled = true;
+        try {
+          const res = await fetch(`/api/groups/${activeGroupId}/dial`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ extension })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            editAction.textContent = data.error || 'Unable to send command.';
+            editAction.classList.add('alert-danger');
+            editAction.classList.remove('d-none');
+            return;
+          }
+          editAction.textContent = `Queued dial to ${data.device_count} phones (ext ${data.extension}).`;
+          editAction.classList.add('alert-success');
+          editAction.classList.remove('d-none');
+        } finally {
+          editTestBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Recordings - alertOffice{% endblock %}
+
+{% block page_title %}Conference Recordings{% endblock %}
+
+{% block page_subtitle %}
+<div class="page-pretitle">Browse and download conference call recordings</div>
+{% endblock %}
+
+{% block page_actions %}
+<div class="col-auto ms-auto d-print-none">
+  <button class="btn btn-outline-secondary" onclick="location.reload()">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+      <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+    </svg>
+    Refresh
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+  <div class="col-12">
+    {% if error %}
+    <div class="alert alert-danger">
+      <div class="d-flex">
+        <div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M12 9v4" />
+            <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" />
+            <path d="M12 16h.01" />
+          </svg>
+        </div>
+        <div>
+          <h4 class="alert-title">Error</h4>
+          <div class="text-muted">{{ error }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if files %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Recordings</h3>
+        <div class="card-actions">
+          <span class="text-muted">{{ files|length }} recording{{ 's' if files|length != 1 else '' }}</span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Conference</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Duration</th>
+              <th>Size</th>
+              <th class="w-1"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in files %}
+            <tr class="recording-row" style="cursor: pointer;" data-filename="{{ file.filename }}" onclick="togglePlayer(this)">
+              <td>
+                <div class="d-flex align-items-center">
+                  <span class="avatar avatar-sm bg-primary-lt me-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                      <path d="M19 9a1 1 0 0 1 1 1a8 8 0 0 1 -6.999 7.938l-.001 2.062h3a1 1 0 0 1 0 2h-8a1 1 0 0 1 0 -2h3v-2.062a8 8 0 0 1 -7 -7.938a1 1 0 1 1 2 0a6 6 0 0 0 12 0a1 1 0 0 1 1 -1m-7 -8a4 4 0 0 1 4 4v5a4 4 0 1 1 -8 0v-5a4 4 0 0 1 4 -4" />
+                    </svg>
+                  </span>
+                  <div>
+                    <div class="font-weight-medium">Conference {{ file.conference }}</div>
+                    <div class="text-muted small">{{ file.filename }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div>{{ file.date_formatted }}</div>
+                <div class="text-muted small">{{ file.date_relative }}</div>
+              </td>
+              <td>{{ file.time_formatted }}</td>
+              <td>
+                {% if file.duration %}
+                <span class="badge bg-blue-lt">{{ file.duration }}</span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="text-muted">{{ file.size_formatted }}</span>
+              </td>
+              <td>
+                <div class="btn-list flex-nowrap">
+                  <a href="/recordings/download/{{ file.filename }}" class="btn btn-sm btn-primary" download onclick="event.stopPropagation()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                      <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                      <path d="M7 11l5 5l5 -5" />
+                      <path d="M12 4l0 12" />
+                    </svg>
+                    Download
+                  </a>
+                  <button class="btn btn-sm btn-danger" onclick="deleteRecording(event, '{{ file.filename }}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                      <path d="M4 7l16 0" />
+                      <path d="M10 11l0 6" />
+                      <path d="M14 11l0 6" />
+                      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                    </svg>
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr class="player-row" id="player-{{ loop.index }}" style="display: none;">
+              <td colspan="6" class="bg-light">
+                <div class="p-3">
+                  <audio controls preload="metadata" class="w-100" style="max-width: 100%;">
+                    <source src="/recordings/stream/{{ file.filename }}" type="audio/{% if file.filename.endswith('.mp3') %}mpeg{% elif file.filename.endswith('.ogg') %}ogg{% else %}wav{% endif %}">
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty">
+      <div class="empty-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <path d="M8 5l11 0" />
+          <path d="M8 9l11 0" />
+          <path d="M8 13l11 0" />
+          <path d="M8 17l11 0" />
+          <path d="M3 5l0 .01" />
+          <path d="M3 9l0 .01" />
+          <path d="M3 13l0 .01" />
+          <path d="M3 17l0 .01" />
+        </svg>
+      </div>
+      <p class="empty-title">No recordings found</p>
+      <p class="empty-subtitle text-muted">
+        Conference recordings will appear here when available
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function togglePlayer(row) {
+  // Find the next row (player row)
+  const playerRow = row.nextElementSibling;
+  
+  if (playerRow && playerRow.classList.contains('player-row')) {
+    // Toggle display
+    if (playerRow.style.display === 'none' || playerRow.style.display === '') {
+      playerRow.style.display = 'table-row';
+      row.style.backgroundColor = '#f8f9fa';
+    } else {
+      playerRow.style.display = 'none';
+      row.style.backgroundColor = '';
+      // Pause audio when closing
+      const audio = playerRow.querySelector('audio');
+      if (audio) {
+        audio.pause();
+      }
+    }
+  }
+}
+
+async function deleteRecording(event, filename) {
+  event.stopPropagation(); // Prevent row click
+  
+  if (!confirm(`Are you sure you want to delete "${filename}"? This cannot be undone.`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/recordings/delete/${encodeURIComponent(filename)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Show success message
+      alert(data.message || 'Recording deleted successfully');
+      // Reload page to refresh the list
+      location.reload();
+    } else {
+      alert(`Error: ${data.error || 'Failed to delete recording'}`);
+    }
+  } catch (error) {
+    console.error('Error deleting recording:', error);
+    alert('Network error while deleting recording');
+  }
+}
+</script>
+{% endblock %}

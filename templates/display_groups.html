@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Display Groups - Alert Office{% endblock %}
+
+{% block page_title %}Phone Groups{% endblock %}
+
+{% block page_subtitle %}
+<div class="page-pretitle">Manage and monitor existing phone groups</div>
+{% endblock %}
+
+{% block page_actions %}
+<div class="col-auto ms-auto d-print-none">
+  <a href="/groups/create" class="btn btn-primary">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <path d="M12 5l0 14" />
+      <path d="M5 12l14 0" />
+    </svg>
+    New Group
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+  {% if groups %}
+  {% for group in groups %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          <div class="me-3">
+            <span class="avatar bg-primary-lt">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+                <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+              </svg>
+            </span>
+          </div>
+          <div class="flex-fill">
+            <div class="font-weight-medium">{{ group.name }}</div>
+            <div class="text-muted">{{ group.device_count }} device{{ 's' if group.device_count != 1 else '' }}</div>
+          </div>
+        </div>
+        {% if group.description %}
+        <div class="text-muted mb-2">{{ group.description }}</div>
+        {% endif %}
+        {% if group.extension %}
+        <div class="mb-3">
+          <span class="badge bg-blue-lt">Extension: {{ group.extension }}</span>
+        </div>
+        {% endif %}
+        <div class="btn-list">
+          <button class="btn btn-outline-primary btn-sm" type="button" data-group-id="{{ group.id }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" />
+              <path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" />
+              <path d="M16 5l3 3" />
+            </svg>
+            Edit
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="col-12">
+    <div class="empty">
+      <div class="empty-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+          <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+        </svg>
+      </div>
+      <p class="empty-title">No phone groups yet</p>
+      <p class="empty-subtitle text-muted">
+        Get started by creating your first phone group
+      </p>
+      <div class="empty-action">
+        <a href="/groups/create" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M12 5l0 14" />
+            <path d="M5 12l14 0" />
+          </svg>
+          Create your first group
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Edit Modal (reuse from old admin.html) -->
+{% include 'edit_group.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/groups.js"></script>
+{% endblock %}

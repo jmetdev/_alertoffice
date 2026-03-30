@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Create Groups - Alert Office{% endblock %}
+
+{% block page_title %}Create Groups{% endblock %}
+
+{% block page_subtitle %}
+<div class="page-pretitle">Create a new phone group for alert notifications</div>
+{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+  <div class="col-lg-8 col-xl-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">New Phone Group</h3>
+      </div>
+      <div class="card-body">
+        <form method="post" action="/groups/create" id="group-form">
+          <div class="mb-3">
+            <label class="form-label required">Group Name</label>
+            <input class="form-control" name="name" placeholder="Enter group name" required>
+            <small class="form-hint">A descriptive name for this phone group</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" name="description" rows="2" placeholder="Optional description"></textarea>
+            <small class="form-hint">Additional details about this group</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Extension</label>
+            <input class="form-control" name="extension" placeholder="e.g. 8888">
+            <small class="form-hint">Extension number to trigger this group</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Add Devices</label>
+            <div class="input-group mb-2">
+              <input class="form-control" id="device-search" placeholder="Search device names (min 3 chars)">
+              <button class="btn btn-outline-primary" type="button" id="search-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                  <path d="M21 21l-6 -6" />
+                </svg>
+                Search
+              </button>
+            </div>
+            <div id="search-results" class="list-group mb-3"></div>
+            <div>
+              <div class="form-label">Selected Devices</div>
+              <ul id="selected-devices" class="list-group"></ul>
+            </div>
+            <input type="hidden" name="devices" id="devices-input" value="[]">
+          </div>
+
+          <div class="mt-4">
+            <button class="btn btn-primary" type="submit">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M12 5l0 14" />
+                <path d="M5 12l14 0" />
+              </svg>
+              Save Group
+            </button>
+            <a href="/groups" class="btn btn-link">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const selected = new Set();
+  const resultsEl = document.getElementById('search-results');
+  const selectedEl = document.getElementById('selected-devices');
+  const devicesInput = document.getElementById('devices-input');
+  const searchBtn = document.getElementById('search-btn');
+  const searchInput = document.getElementById('device-search');
+  let debounceTimer = null;
+
+  function renderSelected() {
+    selectedEl.innerHTML = '';
+    if (selected.size === 0) {
+      selectedEl.innerHTML = '<li class="list-group-item text-muted">No devices selected</li>';
+      devicesInput.value = '[]';
+      return;
+    }
+    Array.from(selected).sort().forEach((name) => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex justify-content-between align-items-center';
+      li.textContent = name;
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn btn-sm btn-outline-danger';
+      removeBtn.textContent = 'Remove';
+      removeBtn.onclick = () => {
+        selected.delete(name);
+        devicesInput.value = JSON.stringify(Array.from(selected));
+        renderSelected();
+      };
+      li.appendChild(removeBtn);
+      selectedEl.appendChild(li);
+    });
+    devicesInput.value = JSON.stringify(Array.from(selected));
+    updateResultMarks();
+  }
+
+  function updateResultMarks() {
+    const items = resultsEl.querySelectorAll('[data-device]');
+    items.forEach((item) => {
+      const deviceName = item.dataset.device;
+      const isSelected = selected.has(deviceName);
+      const check = item.querySelector('.selected-check');
+      if (check) {
+        check.textContent = isSelected ? '✓' : '';
+      }
+      item.disabled = isSelected;
+      item.classList.toggle('disabled', isSelected);
+    });
+  }
+
+  async function searchDevices() {
+    const q = searchInput.value.trim();
+    resultsEl.innerHTML = '';
+    if (q.length < 3) return;
+    resultsEl.innerHTML = '<div class="text-muted">Searching...</div>';
+    const res = await fetch(`/api/devices?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    resultsEl.innerHTML = '';
+    if (!data.length) {
+      const empty = document.createElement('div');
+      empty.className = 'text-muted';
+      empty.textContent = 'No devices found';
+      resultsEl.appendChild(empty);
+      return;
+    }
+    data.forEach((name) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'list-group-item list-group-item-action';
+      item.dataset.device = name.device_name;
+      const title = document.createElement('div');
+      title.className = 'fw-bold';
+      title.textContent = name.device_name;
+      const meta = document.createElement('div');
+      meta.className = 'text-muted small';
+      const pool = name.device_pool || 'No device pool';
+      const desc = name.description || 'No description';
+      meta.textContent = `${pool} • ${desc}`;
+      const check = document.createElement('div');
+      check.className = 'selected-check text-success fw-bold';
+      check.textContent = selected.has(name.device_name) ? '✓' : '';
+      item.appendChild(title);
+      item.appendChild(meta);
+      item.appendChild(check);
+      item.onclick = () => {
+        selected.add(name.device_name);
+        renderSelected();
+      };
+      resultsEl.appendChild(item);
+    });
+    updateResultMarks();
+  }
+
+  function debouncedSearch() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(searchDevices, 300);
+  }
+
+  searchBtn.addEventListener('click', searchDevices);
+  searchInput.addEventListener('input', debouncedSearch);
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchDevices();
+    }
+  });
+
+  renderSelected();
+</script>
+{% endblock %}

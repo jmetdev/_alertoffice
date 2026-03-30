@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}{{ filename }} - Logs - alertOffice{% endblock %}
+
+{% block page_title %}{{ filename }}{% endblock %}
+
+{% block page_subtitle %}
+<div class="page-pretitle">
+  <a href="/logs" class="text-reset">← Back to Logs</a>
+</div>
+{% endblock %}
+
+{% block page_actions %}
+<div class="col-auto ms-auto d-print-none">
+  <div class="btn-list">
+    <a href="/logs/download?file={{ filename }}&type={{ log_type }}" class="btn btn-outline-primary" download>
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+        <path d="M7 11l5 5l5 -5" />
+        <path d="M12 4l0 12" />
+      </svg>
+      Download
+    </a>
+    <button class="btn btn-outline-secondary" onclick="location.reload()">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+      </svg>
+      Refresh
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+  <div class="col-12">
+    {% if error %}
+    <div class="alert alert-danger">
+      <div class="d-flex">
+        <div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M12 9v4" />
+            <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" />
+            <path d="M12 16h.01" />
+          </svg>
+        </div>
+        <div>
+          <h4 class="alert-title">Error</h4>
+          <div class="text-muted">{{ error }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Log Content</h3>
+        <div class="card-actions">
+          <span class="text-muted">{{ file_size }} • {{ line_count }} lines • Last {{ tail_lines }} lines shown</span>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <pre class="bg-dark text-light p-3 mb-0" style="max-height: 70vh; overflow: auto; font-size: 12px; line-height: 1.4;"><code>{{ content }}</code></pre>
+      </div>
+      <div class="card-footer">
+        <div class="d-flex">
+          <div class="text-muted">
+            Showing last {{ tail_lines }} lines. Download the full file to view all content.
+          </div>
+          <div class="ms-auto">
+            <a href="/logs/view?file={{ filename }}&type={{ log_type }}&lines=100" class="btn btn-sm btn-outline-secondary {% if tail_lines == 100 %}active{% endif %}">100</a>
+            <a href="/logs/view?file={{ filename }}&type={{ log_type }}&lines=500" class="btn btn-sm btn-outline-secondary {% if tail_lines == 500 %}active{% endif %}">500</a>
+            <a href="/logs/view?file={{ filename }}&type={{ log_type }}&lines=1000" class="btn btn-sm btn-outline-secondary {% if tail_lines == 1000 %}active{% endif %}">1000</a>
+            <a href="/logs/view?file={{ filename }}&type={{ log_type }}&lines=5000" class="btn btn-sm btn-outline-secondary {% if tail_lines == 5000 %}active{% endif %}">5000</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
