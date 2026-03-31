@@ -17,6 +17,8 @@ const editTestBtn = document.getElementById('edit-test-btn');
 let editSelected = new Set();
 let editDebounceTimer = null;
 let activeGroupId = null;
+/** Latest device_ips / status_map / reachability from GET /api/groups/:id (for table refresh) */
+let editGroupDeviceCache = { device_ips: {}, status_map: {}, reachability: {} };
 
 function renderEditSelected() {
   editSelectedEl.innerHTML = '';
@@ -44,16 +46,42 @@ function renderEditSelected() {
   updateEditResultMarks();
 }
 
-function renderEditDeviceTable(ipMap = {}, statusMap = {}) {
+function formatReachability(r) {
+  if (!r || r.http_ok === null || r.http_ok === undefined) {
+    return '—';
+  }
+  if (r.http_ok === true) {
+    return `200 ${r.http_status != null ? '(' + r.http_status + ')' : ''}`.trim();
+  }
+  const st = r.http_status != null ? String(r.http_status) : '';
+  const err = r.http_error ? String(r.http_error) : 'not 200';
+  return st ? `${st} — ${err}` : err;
+}
+
+function formatCucmWeb(r) {
+  if (!r) return '—';
+  if (r.web_access_label) return String(r.web_access_label);
+  if (r.tkwebaccess != null && r.tkwebaccess !== '') return `tk=${r.tkwebaccess}`;
+  if (r.axl_error) return `AXL: ${r.axl_error}`;
+  return '—';
+}
+
+function renderEditDeviceTable(ipMap, statusMap, reachMap) {
+  const ips = ipMap !== undefined ? ipMap : editGroupDeviceCache.device_ips;
+  const stats = statusMap !== undefined ? statusMap : editGroupDeviceCache.status_map;
+  const reach = reachMap !== undefined ? reachMap : editGroupDeviceCache.reachability;
   editDeviceTable.innerHTML = '';
   if (editSelected.size === 0) {
-    editDeviceTable.innerHTML = '<tr><td colspan="3" class="text-muted">No devices selected</td></tr>';
+    editDeviceTable.innerHTML = '<tr><td colspan="5" class="text-muted">No devices selected</td></tr>';
   } else {
     Array.from(editSelected).sort().forEach((name) => {
       const tr = document.createElement('tr');
-      const ip = ipMap[name] || 'Not found';
-      const status = statusMap[name] || 'Unknown';
-      tr.innerHTML = `<td>${name}</td><td>${ip}</td><td>${status}</td>`;
+      const ip = ips[name] || 'Not found';
+      const status = stats[name] || 'Unknown';
+      const r = reach[name];
+      const httpCol = formatReachability(r);
+      const cucmCol = formatCucmWeb(r);
+      tr.innerHTML = `<td>${name}</td><td>${ip}</td><td>${status}</td><td>${httpCol}</td><td>${cucmCol}</td>`;
       editDeviceTable.appendChild(tr);
     });
   }
@@ -148,6 +176,11 @@ document.querySelectorAll('[data-group-id]').forEach((btn) => {
       return;
     }
     const data = await res.json();
+    editGroupDeviceCache = {
+      device_ips: data.device_ips || {},
+      status_map: data.status_map || {},
+      reachability: data.reachability || {},
+    };
     const group = data.group;
     editForm.action = `/groups/${group.id}/edit`;
     editName.value = group.name || '';
@@ -155,7 +188,7 @@ document.querySelectorAll('[data-group-id]').forEach((btn) => {
     editExtension.value = group.extension || '';
     editSelected = new Set(group.devices || []);
     renderEditSelected();
-    renderEditDeviceTable(data.device_ips || {}, data.status_map || {});
+    renderEditDeviceTable(data.device_ips, data.status_map, data.reachability);
     editModal.show();
   });
 });

@@ -58,6 +58,10 @@ PHONE_HTTP_USERNAME = os.getenv("PHONE_HTTP_USERNAME")
 PHONE_HTTP_PASSWORD = os.getenv("PHONE_HTTP_PASSWORD")
 PHONE_HTTP_SCHEME = os.getenv("PHONE_HTTP_SCHEME", "http").lower()
 PHONE_HTTP_PORT = os.getenv("PHONE_HTTP_PORT", "")
+# GET probe for phone web UI (must return 200 for http_ok); path often "/" or "/localinformation"
+PHONE_HTTP_PROBE_PATH = os.getenv("PHONE_HTTP_PROBE_PATH", "/")
+PHONE_HTTP_PROBE_TIMEOUT = float(os.getenv("PHONE_HTTP_PROBE_TIMEOUT", "3"))
+PHONE_HTTP_VERIFY_SSL = os.getenv("PHONE_HTTP_VERIFY_SSL", "false").lower() in ("true", "1", "yes")
 
 # Redis Connection - required for device IP caching
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -161,6 +165,18 @@ def get_device_info_for_group(device_names):
     device_names = sorted(set(device_names))
     device_ips = get_device_ips_redis(device_names, redis_host=REDIS_HOST, redis_port=REDIS_PORT, redis_password=REDIS_PASSWORD)
     status_map = {name: None for name in device_names}
+    reachability = {
+        name: {
+            "http_ok": None,
+            "http_status": None,
+            "http_error": None,
+            "http_url": None,
+            "tkwebaccess": None,
+            "web_access_label": None,
+            "axl_error": None,
+        }
+        for name in device_names
+    }
 
     if _has_cucm_creds():
         ris_info = get_device_ip_statuses(
@@ -181,15 +197,61 @@ def get_device_info_for_group(device_names):
     else:
         print("CUCM credentials missing; cannot fetch device statuses via RIS.")
 
-    return device_ips, status_map
+    # After RIS: probe phone HTTP; if not 200, query CUCM DB for Web Access (tkwebaccess)
+    from cisco.phone_http_probe import probe_phone_http
+    need_axl: list = []
+    for name in device_names:
+        ip = device_ips.get(name)
+        if not ip:
+            reachability[name]["http_ok"] = False
+            reachability[name]["http_error"] = "no_ip"
+            continue
+        probe = probe_phone_http(
+            ip,
+            scheme=PHONE_HTTP_SCHEME or "http",
+            port=PHONE_HTTP_PORT or "",
+            path=PHONE_HTTP_PROBE_PATH or "/",
+            timeout=PHONE_HTTP_PROBE_TIMEOUT,
+            username=PHONE_HTTP_USERNAME,
+            password=PHONE_HTTP_PASSWORD,
+            verify_tls=PHONE_HTTP_VERIFY_SSL,
+        )
+        reachability[name]["http_ok"] = probe["http_ok"]
+        reachability[name]["http_status"] = probe["http_status"]
+        reachability[name]["http_error"] = probe["http_error"]
+        reachability[name]["http_url"] = probe.get("http_url")
+        if not probe["http_ok"]:
+            need_axl.append(name)
+
+    if need_axl and _has_cucm_creds():
+        try:
+            from cisco.axl_web_access import fetch_devices_web_access_tk
+
+            axl_map = fetch_devices_web_access_tk(
+                CUCM_HOST,
+                CUCM_USERNAME,
+                CUCM_PASSWORD,
+                need_axl,
+                verify_ssl=CUCM_VERIFY_SSL,
+                cucm_version=CUCM_VERSION,
+            )
+            for name in need_axl:
+                row = axl_map.get(name) or {}
+                reachability[name]["tkwebaccess"] = row.get("tkwebaccess")
+                reachability[name]["web_access_label"] = row.get("web_access_label")
+                reachability[name]["axl_error"] = row.get("axl_error")
+        except Exception as e:
+            logger.warning("AXL web-access lookup failed: %s", e)
+            for name in need_axl:
+                reachability[name]["axl_error"] = str(e).strip() or "axl_error"
+
+    return device_ips, status_map, reachability
 
 
 # Ring/alert filename for Play URI (must exist on phone TFTP; common names: Alert1.raw, Beep.raw, etc.)
 PHONE_ALERT_RING_FILE = os.getenv("PHONE_ALERT_RING_FILE", "Analog1.raw")
-# Seconds to wait after sending Dial before sending Mute/Play/display (avoids dial getting stuck)
+# Seconds to wait after sending Dial before Play/display (avoids dial getting stuck)
 PHONE_DIAL_DELAY_SECONDS = float(os.getenv("PHONE_DIAL_DELAY_SECONDS", "2.5"))
-# Seconds between Mute and Play requests so the phone processes each separately
-PHONE_POST_DIAL_GAP_SECONDS = float(os.getenv("PHONE_POST_DIAL_GAP_SECONDS", "0.5"))
 
 
 def _build_dial_only_xml(extension: str) -> str:
@@ -198,16 +260,6 @@ def _build_dial_only_xml(extension: str) -> str:
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<CiscoIPPhoneExecute>'
         f'<ExecuteItem Priority="0" URL="Dial:{extension}"/>'
-        '</CiscoIPPhoneExecute>'
-    )
-
-
-def _build_mute_xml() -> str:
-    """Build CiscoIPPhoneExecute XML with only Key:Mute (sent as its own request)."""
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<CiscoIPPhoneExecute>'
-        '<ExecuteItem Priority="0" URL="Key:Mute"/>'
         '</CiscoIPPhoneExecute>'
     )
 
@@ -277,17 +329,13 @@ async def _post_xml_to_phone(ip_address: str, xml_body: str, command_label: str 
 
 async def _send_dial_to_phones(ip_addresses, extension: str):
     dial_xml = _build_dial_only_xml(extension)
-    mute_xml = _build_mute_xml()
     play_xml = _build_play_alert_xml()
     display_xml = _build_alert_display_xml()
     delay_sec = max(0.0, PHONE_DIAL_DELAY_SECONDS)
-    gap_sec = max(0.0, PHONE_POST_DIAL_GAP_SECONDS)
 
     async def send_to_one(ip: str):
         dial_ok = await _post_xml_to_phone(ip, dial_xml, "Dial")
         await asyncio.sleep(delay_sec)
-        await _post_xml_to_phone(ip, mute_xml, "Mute")
-        await asyncio.sleep(gap_sec)
         await _post_xml_to_phone(ip, play_xml, "Play")
         await _post_xml_to_phone(ip, display_xml, "Text Display")
         return dial_ok
@@ -932,7 +980,7 @@ def api_group_details(group_id):
     if not group:
         return jsonify({"error": "Group not found"}), 404
     try:
-        device_ips, status_map = get_device_info_for_group(group["devices"])
+        device_ips, status_map, reachability = get_device_info_for_group(group["devices"])
     except ConnectionError as e:
         logger.exception(f"Redis connection error while serving group details API. Redis config: host={REDIS_HOST}, port={REDIS_PORT}")
         return jsonify({
@@ -942,7 +990,8 @@ def api_group_details(group_id):
     return jsonify({
         "group": group,
         "device_ips": device_ips,
-        "status_map": status_map
+        "status_map": status_map,
+        "reachability": reachability,
     })
 
 
@@ -954,7 +1003,7 @@ def api_group_dial(group_id):
         return jsonify({"error": "Group not found"}), 404
     payload = request.get_json(silent=True) or {}
     extension = (payload.get("extension") or group.get("extension") or "8888").strip()
-    device_ips, _ = get_device_info_for_group(group["devices"])
+    device_ips, _, _ = get_device_info_for_group(group["devices"])
     ip_addresses = [ip for ip in device_ips.values() if ip]
     if not ip_addresses:
         logger.error(f"Dial request failed: no IPs for group {group_id}.")
@@ -991,7 +1040,7 @@ def xacml_webhook():
     if lookup_number:
         group = get_group_by_extension(lookup_number)
         if group:
-            device_ips, _ = get_device_info_for_group(group["devices"])
+            device_ips, _, _ = get_device_info_for_group(group["devices"])
             ip_addresses = [ip for ip in device_ips.values() if ip]
             if ip_addresses:
                 extension = group.get("extension") or lookup_number
