@@ -39,8 +39,8 @@ services:
       # Application logs
       - /opt/alertoffice/logs:/app/logs
       
-      # Conference recordings
-      - /opt/alertoffice/recordings:/recordings
+      # Conference recordings (same host dir FreeSWITCH writes)
+      - ${FREESWITCH_RECORDINGS_DIR:-/opt/alertoffice/recordings}:/recordings
       
       # FreeSWITCH logs (read-only mount)
       - /opt/freeswitch/logs:/logs:ro
