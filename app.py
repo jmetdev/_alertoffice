@@ -574,8 +574,8 @@ def logs_page():
                     "modified": modified
                 })
         
-        # FreeSWITCH logs (/logs directory)
-        freeswitch_dir = "/bridge/logs"
+        # FreeSWITCH logs (compose mounts the FreeSWITCH log dir here)
+        freeswitch_dir = "/logs"
         if os.path.exists(freeswitch_dir):
             fs_files = [f for f in os.listdir(freeswitch_dir) if f.endswith('.log')]
             for filename in sorted(fs_files, reverse=True):
@@ -622,7 +622,7 @@ def view_log():
     
     # Determine log directory based on type
     if log_type == "freeswitch":
-        log_dir = "/bridge/logs"
+        log_dir = "/logs"
     else:
         log_dir = os.path.join(os.getcwd(), 'logs')
     
@@ -690,7 +690,7 @@ def download_log():
     
     # Determine log directory based on type
     if log_type == "freeswitch":
-        log_dir = "/bridge/logs"
+        log_dir = "/logs"
     else:
         log_dir = os.path.join(os.getcwd(), 'logs')
     

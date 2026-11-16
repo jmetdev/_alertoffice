@@ -40,10 +40,10 @@ services:
       - /opt/alertoffice/logs:/app/logs
       
       # Conference recordings (same host dir FreeSWITCH writes)
-      - ${FREESWITCH_RECORDINGS_DIR:-/opt/alertoffice/recordings}:/recordings
+      - ${FREESWITCH_RECORDINGS_DIR:-/opt/freeswitch-webex-lgw/runtime/recordings}:/recordings
       
       # FreeSWITCH logs (read-only mount)
-      - /opt/freeswitch/logs:/logs:ro
+      - ${FREESWITCH_LOG_DIR:-/opt/freeswitch-webex-lgw/runtime/logs}:/logs:ro
     
     depends_on:
       redis:
